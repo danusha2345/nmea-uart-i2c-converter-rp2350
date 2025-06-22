@@ -3,9 +3,9 @@
  * Generates synthetic NMEA data for testing UART to I2C converter
  * Compatible with: RP2040, RP2350, ESP32-C3, etc.
  * 
- * Connections:
- * Generator TX -> Converter RX (GPIO1)
- * Generator GND -> Converter GND
+ * Connections (Waveshare boards):
+ * Generator Pin 2 (GPIO0/TX) -> Converter Pin 3 (GPIO1/RX)
+ * Generator Pin 1 (GND) -> Converter Pin 1 (GND)
  * 
  * Author: NMEA Converter Test Suite
  * License: MIT
@@ -20,7 +20,7 @@
   #define TX_PIN 1   // ESP32-C3 default TX
   #define HAS_SERIAL1
 #elif defined(ARDUINO_ARCH_RP2040)
-  #define TX_PIN 0   // RP2040/RP2350 default TX
+  #define TX_PIN 0   // RP2040/RP2350 default TX (GPIO0)
   #define HAS_SERIAL1
 #else
   #define TX_PIN 1   // Default TX
@@ -48,10 +48,15 @@ void setup() {
   // Initialize serial for debugging
   Serial.begin(115200);
   
-  // Wait for serial on boards with native USB
-  #if defined(ARDUINO_ARCH_RP2040) || defined(ESP32)
-  delay(2000);
+  // Wait for USB CDC on RP2040
+  #if defined(ARDUINO_ARCH_RP2040)
+    while (!Serial) {
+      delay(10); // Wait for USB Serial to be ready
+    }
   #endif
+  
+  // Additional delay for stability
+  delay(1000);
   
   // Initialize UART for NMEA output
   #ifdef ESP32
@@ -62,7 +67,7 @@ void setup() {
   
   // Startup message
   Serial.println(F("================================="));
-  Serial.println(F("    NMEA Test Generator v1.2    "));
+  Serial.println(F("    NMEA Test Generator v1.3    "));
   Serial.println(F("================================="));
   Serial.print(F("Board: "));
   #if defined(ESP32)
@@ -78,6 +83,13 @@ void setup() {
   Serial.print(F("Interval: "));
   Serial.print(NMEA_SEND_INTERVAL);
   Serial.println(F(" ms"));
+  
+  // Pin mapping info for Waveshare boards
+  Serial.println(F("\nWaveshare Pin Mapping:"));
+  Serial.println(F("Pin 1 = GND"));
+  Serial.println(F("Pin 2 = GPIO0 (TX)"));
+  Serial.println(F("Pin 3 = GPIO1"));
+  
   Serial.println(F("\nStarting NMEA generation...\n"));
 }
 
