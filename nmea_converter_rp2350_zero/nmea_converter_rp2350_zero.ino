@@ -1,6 +1,6 @@
 /*
  * NMEA UART to I2C Converter for Waveshare RP2350-Zero
- * Version: 2.3
+ * Version: 2.4
  * 
  * Features:
  * - Optimized for RP2350-Zero board
@@ -10,6 +10,7 @@
  * - Circular buffer with overflow protection
  * - NMEA checksum validation
  * - Multiple I2C commands support
+ * - Optimized 96-byte I2C packet size for NMEA efficiency
  * 
  * Author: GitHub Actions Builder
  * License: MIT
@@ -44,7 +45,7 @@
 #define I2C_SLAVE_ADDRESS 0x42  // I2C slave address
 #define UART_BAUD_RATE 115200   // UART baud rate for GNSS
 #define NMEA_BUFFER_SIZE 4096   // Main buffer size
-#define I2C_PACKET_SIZE 32      // I2C packet size
+#define I2C_PACKET_SIZE 96      // I2C packet size - optimized for NMEA (was 32)
 #define NMEA_MAX_LENGTH 82      // Max NMEA sentence length
 
 // I2C Commands
@@ -57,7 +58,7 @@
 #define CMD_SET_MODE      0x07  // Set operation mode
 
 // Firmware info
-#define FIRMWARE_VERSION  0x23  // Version 2.3
+#define FIRMWARE_VERSION  0x24  // Version 2.4 - optimized packet size
 #define BOARD_TYPE       "RP2350-Zero"
 
 // Status flags structure
@@ -401,7 +402,7 @@ void setup() {
     }
     
     Serial.println("=====================================");
-    Serial.println("  NMEA UART to I2C Converter v2.3  ");
+    Serial.println("  NMEA UART to I2C Converter v2.4  ");
     Serial.println("    For Waveshare RP2350-Zero      ");
     Serial.println("=====================================");
     
@@ -443,6 +444,7 @@ void setup() {
     Serial.println(I2C_SLAVE_ADDRESS, HEX);
     Serial.print("     - SDA: GPIO"); Serial.println(I2C_SDA_PIN);
     Serial.print("     - SCL: GPIO"); Serial.println(I2C_SCL_PIN);
+    Serial.print("     - Packet size: "); Serial.print(I2C_PACKET_SIZE); Serial.println(" bytes");
     
     Serial.println("\n[READY] Waiting for NMEA data...\n");
 }
