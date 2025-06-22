@@ -1,0 +1,78 @@
+name: Build Test Generator FIXED
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'test/nmea_test_generator/**'
+      - '.github/workflows/build-test-generator-fixed.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-multiple:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        board:
+          # RP2040 boards - using rpipico for RP2040
+          - { name: "RP2040-Pico", fqbn: "rp2040:rp2040:rpipico", desc: "For Raspberry Pi Pico (RP2040)" }
+          - { name: "RP2040-Zero", fqbn: "rp2040:rp2040:rpipicow", desc: "For Waveshare RP2040-Zero" }
+          - { name: "RP2040-Tiny", fqbn: "rp2040:rp2040:rpipico", desc: "For Waveshare RP2040-Tiny" }
+          # RP2350 boards - using rpipico2 for RP2350
+          - { name: "RP2350-Pico2", fqbn: "rp2040:rp2040:rpipico2", desc: "For Raspberry Pi Pico 2 (RP2350)" }
+          - { name: "RP2350-Zero", fqbn: "rp2040:rp2040:rpipico2", desc: "For Waveshare RP2350-Zero" }
+          # ESP32
+          - { name: "ESP32-C3", fqbn: "esp32:esp32:esp32c3", desc: "For ESP32-C3 boards" }
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v1
+        
+    - name: Install RP2040/RP2350 Core
+      if: contains(matrix.board.fqbn, 'rp2040')
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040
+        
+    - name: Install ESP32 Core
+      if: contains(matrix.board.fqbn, 'esp32')
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+        arduino-cli core update-index
+        arduino-cli core install esp32:esp32
+        
+    - name: Compile Test Generator
+      run: |
+        mkdir -p ./build/"${{ matrix.board.name }}"
+        arduino-cli compile --fqbn ${{ matrix.board.fqbn }} \
+          --output-dir ./build/"${{ matrix.board.name }}" \
+          --export-binaries \
+          ./test/nmea_test_generator
+          
+    - name: Generate Build Info
+      run: |
+        echo "Build Date: $(date)" > "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "Board: ${{ matrix.board.name }}" >> "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "Description: ${{ matrix.board.desc }}" >> "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "FQBN: ${{ matrix.board.fqbn }}" >> "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "" >> "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "This is NMEA test generator firmware." >> "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "Connect TX (GPIO0) to converter's RX (GPIO1)" >> "./build/${{ matrix.board.name }}/build_info.txt"
+        
+    - name: Upload Firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-generator-${{ matrix.board.name }}-${{ github.run_number }}
+        path: |
+          build/${{ matrix.board.name }}/*.hex
+          build/${{ matrix.board.name }}/*.bin
+          build/${{ matrix.board.name }}/*.uf2
+          build/${{ matrix.board.name }}/build_info.txt
+        retention-days: 30
