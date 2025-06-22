@@ -34,6 +34,7 @@ int dataCount = 0;
 int sentenceCount = 0;
 unsigned long lastTestTime = 0;
 int testIndex = 0;
+bool startupShown = false;
 
 // Test sentences
 const char* testSentences[] = {
@@ -46,29 +47,53 @@ const char* testSentences[] = {
 // I2C commands
 uint8_t lastCommand = 0;
 
-void setup() {
-  // USB Serial
-  Serial.begin(115200);
-  while (!Serial && millis() < 3000) delay(10);
-  
-  Serial.println("\n=====================================");
+void showStartupInfo() {
+  Serial.println("\n\n=====================================");
   Serial.println("  NMEA Converter v2.5 - WORKING    ");
   Serial.println("=====================================");
   
   if (TEST_MODE) {
     Serial.println("\n[TEST MODE ENABLED]");
     Serial.println("Generating test NMEA data internally");
-    Serial.println("NO wire connection needed!\n");
+    Serial.println("NO wire connection needed!");
   } else {
     Serial.println("\n[NORMAL MODE]");
-    Serial.println("Connect GPS TX to GPIO1\n");
+    Serial.println("Connect GPS TX to GPIO1");
   }
+  
+  Serial.println("\nPIN CONNECTIONS:");
+  Serial.println("- GPIO1 (Pin 1 right side) = UART RX");
+  Serial.println("- GPIO4 (Pin 4 right side) = I2C SDA");
+  Serial.println("- GPIO5 (Pin 5 right side) = I2C SCL");
+  
+  Serial.println("\n[OK] UART initialized on GPIO1");
+  Serial.print("[OK] I2C slave on address 0x");
+  Serial.println(I2C_SLAVE_ADDRESS, HEX);
+  
+  Serial.println("\n[READY] System started\n");
+  Serial.println("=====================================\n");
+}
+
+void setup() {
+  // USB Serial
+  Serial.begin(115200);
+  
+  // Wait for USB connection with timeout
+  unsigned long waitStart = millis();
+  while (!Serial && millis() - waitStart < 5000) {
+    delay(10);
+  }
+  
+  // Extra delay to ensure terminal is ready
+  delay(2000);
+  
+  // Show startup info
+  showStartupInfo();
   
   // Initialize UART for GPS input
   Serial1.setRX(GPIO1);
   Serial1.setTX(GPIO0);  // Not used in normal mode
   Serial1.begin(UART_BAUD_RATE);
-  Serial.println("[OK] UART initialized on GPIO1");
   
   // Initialize I2C
   Wire.setSDA(GPIO4);
@@ -76,10 +101,6 @@ void setup() {
   Wire.begin(I2C_SLAVE_ADDRESS);
   Wire.onReceive(onI2CReceive);
   Wire.onRequest(onI2CRequest);
-  Serial.print("[OK] I2C slave on address 0x");
-  Serial.println(I2C_SLAVE_ADDRESS, HEX);
-  
-  Serial.println("\n[READY] System started\n");
 }
 
 void generateTestData() {
@@ -180,6 +201,12 @@ void onI2CRequest() {
 }
 
 void loop() {
+  // Show startup info again if just connected
+  if (!startupShown && Serial) {
+    showStartupInfo();
+    startupShown = true;
+  }
+  
   // Generate test data if in test mode
   generateTestData();
   
@@ -191,13 +218,14 @@ void loop() {
   if (millis() - lastStatus > 5000) {
     lastStatus = millis();
     
-    Serial.print("[STATUS] Mode: ");
+    Serial.print("\n[STATUS] Mode: ");
     Serial.print(TEST_MODE ? "TEST" : "NORMAL");
     Serial.print(", Sentences: ");
     Serial.print(sentenceCount);
     Serial.print(", Buffer: ");
     Serial.print(dataCount);
     Serial.print("/");
-    Serial.println(NMEA_BUFFER_SIZE);
+    Serial.print(NMEA_BUFFER_SIZE);
+    Serial.println("\n");
   }
 }
