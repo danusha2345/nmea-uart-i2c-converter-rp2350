@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+*.uf2
+*.elf
+*.bin
+*.hex
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arduino
+.development
+*.tmp
+
+# Logs
+*.log
