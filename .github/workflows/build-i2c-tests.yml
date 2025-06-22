@@ -1,0 +1,108 @@
+name: Build I2C Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'test/i2c_master_test/**'
+      - 'test/nmea_parser_portapack/**'
+      - '.github/workflows/build-i2c-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  build-i2c-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v1
+      
+    - name: Install RP2040/RP2350 Core
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040
+    
+    - name: Build I2C Master Test for RP2040
+      run: |
+        mkdir -p ./build/i2c-test-rp2040
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico --output-dir ./build/i2c-test-rp2040 --export-binaries ./test/i2c_master_test
+    
+    - name: Build I2C Master Test for RP2350
+      run: |
+        mkdir -p ./build/i2c-test-rp2350
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 --output-dir ./build/i2c-test-rp2350 --export-binaries ./test/i2c_master_test
+    
+    - name: Build NMEA Parser for RP2040
+      run: |
+        mkdir -p ./build/nmea-parser-rp2040
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico --output-dir ./build/nmea-parser-rp2040 --export-binaries ./test/nmea_parser_portapack
+    
+    - name: Build NMEA Parser for RP2350
+      run: |
+        mkdir -p ./build/nmea-parser-rp2350
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 --output-dir ./build/nmea-parser-rp2350 --export-binaries ./test/nmea_parser_portapack
+    
+    - name: Create Test Info
+      run: |
+        cat > ./build/README.txt << 'EOF'
+        I2C Test Firmware for NMEA Converter
+        ====================================
+        
+        This package contains I2C test programs for testing the NMEA converter.
+        
+        FILES:
+        ------
+        1. i2c-test-rp2040/i2c_master_test.uf2
+           - Basic I2C test for RP2040 boards (Pico, RP2040-Tiny, etc)
+           - Shows raw NMEA data received via I2C
+        
+        2. i2c-test-rp2350/i2c_master_test.uf2
+           - Same test for RP2350 boards
+        
+        3. nmea-parser-rp2040/nmea_parser_portapack.uf2
+           - Advanced test with NMEA parsing for RP2040
+           - Simulates PortaPack GPS app behavior
+           - Shows parsed GPS coordinates, speed, altitude
+        
+        4. nmea-parser-rp2350/nmea_parser_portapack.uf2
+           - Same parser for RP2350 boards
+        
+        HOW TO USE:
+        -----------
+        1. Your RP2350-Zero should already have the NMEA converter firmware
+        2. Load one of these test firmwares on a SECOND board
+        3. Connect I2C between boards:
+           - Master SDA (GPIO4) -> Converter SDA (GPIO4)
+           - Master SCL (GPIO5) -> Converter SCL (GPIO5)
+           - Master GND -> Converter GND
+        4. Open Serial Monitor on the test board (115200 baud)
+        5. You should see NMEA data being received via I2C
+        
+        WHAT YOU SHOULD SEE:
+        -------------------
+        Basic test output:
+        [I2C] 68 bytes available
+        [RAW DATA] $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47
+        
+        Parser test output:
+        ===== GPS STATUS (PortaPack Format) =====
+        Fix: VALID
+        UTC Time: 12:35:19
+        Latitude: 48.117300°
+        Longitude: 11.516667°
+        
+        Build Date: $(date)
+        EOF
+    
+    - name: Upload I2C Test Firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: i2c-test-firmware-${{ github.run_number }}
+        path: |
+          build/**/*.uf2
+          build/README.txt
+        retention-days: 30
