@@ -1,0 +1,100 @@
+name: Build All Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'test/**'
+      - '.github/workflows/build-all-tests.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v1
+      
+    - name: Install RP2040/RP2350 Core
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040
+        
+    - name: Build GPIO Simple Test
+      run: |
+        mkdir -p ./build/gpio_simple_test
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build/gpio_simple_test \
+          --export-binaries \
+          ./test/gpio_simple_test
+          
+    - name: Build GPIO Pin Test
+      run: |
+        mkdir -p ./build/gpio_pin_test
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build/gpio_pin_test \
+          --export-binaries \
+          ./test/gpio_pin_test
+          
+    - name: Build UART Loopback Test
+      run: |
+        mkdir -p ./build/uart_loopback_test
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build/uart_loopback_test \
+          --export-binaries \
+          ./test/uart_loopback_test
+          
+    - name: Build NMEA Converter Self Test
+      run: |
+        mkdir -p ./build/nmea_converter_self_test
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build/nmea_converter_self_test \
+          --export-binaries \
+          ./test/nmea_converter_self_test
+          
+    - name: Build NMEA Converter GPIO Explicit
+      run: |
+        mkdir -p ./build/nmea_converter_gpio_explicit
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build/nmea_converter_gpio_explicit \
+          --export-binaries \
+          ./test/nmea_converter_gpio_explicit
+          
+    - name: Build Simple NMEA Generator
+      run: |
+        mkdir -p ./build/nmea_simple_generator
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build/nmea_simple_generator \
+          --export-binaries \
+          ./test/nmea_simple_generator
+          
+    - name: Generate Test Info
+      run: |
+        echo "Test Firmware Builds" > ./build/README.txt
+        echo "===================" >> ./build/README.txt
+        echo "" >> ./build/README.txt
+        echo "1. gpio_simple_test - Basic GPIO0/GPIO1 connectivity test" >> ./build/README.txt
+        echo "2. gpio_pin_test - GPIO pin verification" >> ./build/README.txt
+        echo "3. uart_loopback_test - UART loopback test" >> ./build/README.txt
+        echo "4. nmea_converter_self_test - Converter with self-test mode" >> ./build/README.txt
+        echo "5. nmea_converter_gpio_explicit - Converter with clear GPIO names" >> ./build/README.txt
+        echo "6. nmea_simple_generator - Simple NMEA generator (no USB needed)" >> ./build/README.txt
+        echo "" >> ./build/README.txt
+        echo "For RP2350-Zero: Connect GPIO0 to GPIO1 for loopback tests" >> ./build/README.txt
+        echo "Build Date: $(date)" >> ./build/README.txt
+        
+    - name: Upload All Test Firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: rp2350-test-firmware-${{ github.run_number }}
+        path: |
+          build/**/*.uf2
+          build/README.txt
+        retention-days: 30
