@@ -1,10 +1,10 @@
 /*
  * NMEA Test Generator
  * Generates synthetic NMEA data for testing UART to I2C converter
- * Compatible with: RP2040-Tiny, ESP32-C3-Mini, Arduino, etc.
+ * Compatible with: RP2040, RP2350, ESP32-C3, Arduino Uno/Nano, etc.
  * 
  * Connections:
- * Generator TX (GPIO0) -> Converter RX (GPIO1)
+ * Generator TX -> Converter RX (GPIO1)
  * Generator GND -> Converter GND
  * 
  * Author: NMEA Converter Test Suite
@@ -16,15 +16,25 @@
 #define USE_REAL_COORDINATES true // Use real coordinates or test pattern
 
 // Pin configuration - adjust for your board
-#ifdef ESP32
+#if defined(ESP32)
   #define TX_PIN 1   // ESP32-C3 default TX
   #define LED_PIN 2  // ESP32-C3 onboard LED
+  #define HAS_SERIAL1
 #elif defined(ARDUINO_ARCH_RP2040)
   #define TX_PIN 0   // RP2040 default TX
-  #define LED_PIN 25 // RP2040 onboard LED (if available)
+  #define LED_PIN 25 // RP2040 onboard LED (Pico has it)
+  #define HAS_SERIAL1
+#elif defined(__AVR__)
+  // Arduino Uno/Nano - use software serial
+  #include <SoftwareSerial.h>
+  #define TX_PIN 3   // Software serial TX
+  #define RX_PIN 2   // Software serial RX (not used)
+  #define LED_PIN 13 // Arduino onboard LED
+  SoftwareSerial nmeaSerial(RX_PIN, TX_PIN);
 #else
   #define TX_PIN 1   // Default TX
   #define LED_PIN LED_BUILTIN
+  #define HAS_SERIAL1
 #endif
 
 // Global variables
@@ -48,26 +58,47 @@ void setup() {
   // Initialize serial for debugging
   Serial.begin(115200);
   
+  // Wait for serial on boards with native USB
+  #if defined(ARDUINO_ARCH_RP2040) || defined(ESP32)
+  delay(2000);
+  #endif
+  
   // Initialize UART for NMEA output
-  #ifdef ESP32
-    Serial1.begin(115200, SERIAL_8N1, -1, TX_PIN); // ESP32 allows pin remapping
+  #ifdef HAS_SERIAL1
+    #ifdef ESP32
+      Serial1.begin(115200, SERIAL_8N1, -1, TX_PIN); // ESP32 allows pin remapping
+    #else
+      Serial1.begin(115200);
+    #endif
   #else
-    Serial1.begin(115200);
+    // Use software serial for AVR boards
+    nmeaSerial.begin(115200);
   #endif
   
   // Configure LED
   pinMode(LED_PIN, OUTPUT);
   
   // Startup message
-  Serial.println("=================================");
-  Serial.println("    NMEA Test Generator v1.0    ");
-  Serial.println("=================================");
-  Serial.print("Sending NMEA on TX pin: GPIO");
+  Serial.println(F("================================="));
+  Serial.println(F("    NMEA Test Generator v1.1    "));
+  Serial.println(F("================================="));
+  Serial.print(F("Board: "));
+  #if defined(ESP32)
+    Serial.println(F("ESP32"));
+  #elif defined(ARDUINO_ARCH_RP2040)
+    Serial.println(F("RP2040/RP2350"));
+  #elif defined(__AVR__)
+    Serial.println(F("Arduino AVR"));
+  #else
+    Serial.println(F("Unknown"));
+  #endif
+  
+  Serial.print(F("TX Pin: GPIO"));
   Serial.println(TX_PIN);
-  Serial.print("Interval: ");
+  Serial.print(F("Interval: "));
   Serial.print(NMEA_SEND_INTERVAL);
-  Serial.println(" ms");
-  Serial.println("\nStarting NMEA generation...\n");
+  Serial.println(F(" ms"));
+  Serial.println(F("\nStarting NMEA generation...\n"));
   
   // Blink LED 3 times to indicate startup
   for (int i = 0; i < 3; i++) {
@@ -128,22 +159,30 @@ String generateGPGGA() {
   String sentence = "$GPGGA,";
   
   // Time: HHMMSS.SS
-  sentence += String(hours, DEC).length() == 1 ? "0" + String(hours) : String(hours);
-  sentence += String(minutes, DEC).length() == 1 ? "0" + String(minutes) : String(minutes);
-  sentence += String(seconds, DEC).length() == 1 ? "0" + String(seconds) : String(seconds);
+  if (hours < 10) sentence += "0";
+  sentence += String(hours);
+  if (minutes < 10) sentence += "0";
+  sentence += String(minutes);
+  if (seconds < 10) sentence += "0";
+  sentence += String(seconds);
   sentence += ".00,";
   
   // Latitude: DDMM.MMMM,N/S
   int latDeg = (int)latitude;
   float latMin = (latitude - latDeg) * 60;
-  sentence += String(latDeg, DEC).length() == 1 ? "0" + String(latDeg) : String(latDeg);
+  if (latDeg < 10) sentence += "0";
+  sentence += String(latDeg);
+  if (latMin < 10) sentence += "0";
   sentence += String(latMin, 4);
   sentence += ",N,";
   
   // Longitude: DDDMM.MMMM,E/W
   int lonDeg = (int)longitude;
   float lonMin = (longitude - lonDeg) * 60;
-  sentence += String(lonDeg, DEC).length() == 2 ? "0" + String(lonDeg) : String(lonDeg);
+  if (lonDeg < 10) sentence += "00";
+  else if (lonDeg < 100) sentence += "0";
+  sentence += String(lonDeg);
+  if (lonMin < 10) sentence += "0";
   sentence += String(lonMin, 4);
   sentence += ",E,";
   
@@ -178,9 +217,12 @@ String generateGPRMC() {
   String sentence = "$GPRMC,";
   
   // Time
-  sentence += String(hours, DEC).length() == 1 ? "0" + String(hours) : String(hours);
-  sentence += String(minutes, DEC).length() == 1 ? "0" + String(minutes) : String(minutes);
-  sentence += String(seconds, DEC).length() == 1 ? "0" + String(seconds) : String(seconds);
+  if (hours < 10) sentence += "0";
+  sentence += String(hours);
+  if (minutes < 10) sentence += "0";
+  sentence += String(minutes);
+  if (seconds < 10) sentence += "0";
+  sentence += String(seconds);
   sentence += ".00,";
   
   // Status: A = active
@@ -189,14 +231,19 @@ String generateGPRMC() {
   // Latitude
   int latDeg = (int)latitude;
   float latMin = (latitude - latDeg) * 60;
-  sentence += String(latDeg, DEC).length() == 1 ? "0" + String(latDeg) : String(latDeg);
+  if (latDeg < 10) sentence += "0";
+  sentence += String(latDeg);
+  if (latMin < 10) sentence += "0";
   sentence += String(latMin, 4);
   sentence += ",N,";
   
   // Longitude
   int lonDeg = (int)longitude;
   float lonMin = (longitude - lonDeg) * 60;
-  sentence += String(lonDeg, DEC).length() == 2 ? "0" + String(lonDeg) : String(lonDeg);
+  if (lonDeg < 10) sentence += "00";
+  else if (lonDeg < 100) sentence += "0";
+  sentence += String(lonDeg);
+  if (lonMin < 10) sentence += "0";
   sentence += String(lonMin, 4);
   sentence += ",E,";
   
@@ -273,7 +320,7 @@ String calculateNMEAChecksum(String sentence) {
   byte checksum = 0;
   
   // Start after '$' and calculate until '*' or end
-  for (int i = 1; i < sentence.length(); i++) {
+  for (unsigned int i = 1; i < sentence.length(); i++) {
     if (sentence[i] == '*') break;
     checksum ^= sentence[i];
   }
@@ -290,26 +337,32 @@ String calculateNMEAChecksum(String sentence) {
   return checksumStr;
 }
 
-// Send NMEA sentence via Serial1
+// Send NMEA sentence via Serial
 void sendNMEASentence(String sentence) {
   // Send to UART
-  Serial1.print(sentence);
-  Serial1.print("\r\n");
+  #ifdef HAS_SERIAL1
+    Serial1.print(sentence);
+    Serial1.print("\r\n");
+  #else
+    // Use software serial for AVR
+    nmeaSerial.print(sentence);
+    nmeaSerial.print("\r\n");
+  #endif
   
   // Echo to debug serial
-  Serial.print("[SENT] ");
+  Serial.print(F("[SENT] "));
   Serial.println(sentence);
   
   // Show statistics every 10 sentences
   if (sentenceCounter % 10 == 0 && sentenceCounter > 0) {
-    Serial.print("\n[STATS] Sent ");
+    Serial.print(F("\n[STATS] Sent "));
     Serial.print(sentenceCounter);
-    Serial.print(" sentences, Position: ");
+    Serial.print(F(" sentences, Pos: "));
     Serial.print(latitude, 6);
-    Serial.print(",");
+    Serial.print(F(","));
     Serial.print(longitude, 6);
-    Serial.print(", Alt: ");
+    Serial.print(F(", Alt: "));
     Serial.print(altitude, 1);
-    Serial.println("m\n");
+    Serial.println(F("m\n"));
   }
 }
