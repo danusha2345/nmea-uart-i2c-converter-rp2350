@@ -30,7 +30,7 @@ jobs:
         mkdir -p ./release
         arduino-cli compile --fqbn rp2040:rp2040:rpipico2 --output-dir ./release --export-binaries ./nmea_converter_portapack_release
     
-    - name: Create Release Info
+    - name: Create Release Documentation
       run: |
         cat > ./release/README.txt << 'EOF'
         NMEA UART to I2C Converter for PortaPack H4M
@@ -54,6 +54,14 @@ jobs:
                            GPIO4 (Pin 4) ----> SDA
                            GPIO5 (Pin 5) ----> SCL
         
+        PIN MAPPING (Right side of RP2350-Zero, top to bottom):
+        Pin 0 = GPIO0
+        Pin 1 = GPIO1 <- GPS RX HERE
+        Pin 2 = GPIO2
+        Pin 3 = GPIO3
+        Pin 4 = GPIO4 <- I2C SDA HERE
+        Pin 5 = GPIO5 <- I2C SCL HERE
+        
         INSTALLATION:
         1. Connect RP2350-Zero to PC via USB-C
         2. Hold BOOT button and press RESET
@@ -61,10 +69,17 @@ jobs:
         4. Board will reboot automatically
         
         USAGE:
-        1. Connect GPS module to RP2350-Zero
+        1. Connect GPS module TX to GPIO1 (Pin 1)
         2. Connect I2C from RP2350-Zero to PortaPack
-        3. Start GPS app on PortaPack
+        3. Power on PortaPack and start GPS app
         4. GPS data should appear automatically
+        
+        I2C PROTOCOL:
+        - 0x01: GET_STATUS (returns 1 byte)
+        - 0x02: GET_COUNT (returns 2 bytes, little-endian)
+        - 0x03: READ_DATA (returns up to 32 bytes)
+        - 0x04: CLEAR_BUFFER (returns 0x01)
+        - 0x05: GET_VERSION (returns 0x10 for v1.0)
         
         Build Date: $(date)
         EOF
@@ -74,44 +89,14 @@ jobs:
         echo "1.0.0" > ./release/VERSION
         echo "Release for PortaPack H4M" >> ./release/VERSION
         echo "I2C Address: 0x10" >> ./release/VERSION
+        echo "Build: $(date +%Y%m%d-%H%M%S)" >> ./release/VERSION
     
-    - name: Upload Release Firmware
+    - name: Upload Release Package
       uses: actions/upload-artifact@v4
       with:
-        name: nmea-converter-portapack-v1.0-release
+        name: NMEA-Converter-PortaPack-v1.0-RELEASE
         path: |
           release/*.uf2
           release/README.txt
           release/VERSION
         retention-days: 90
-        
-    - name: Create GitHub Release
-      if: github.event_name == 'push'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v1.0.0
-        name: NMEA Converter v1.0.0 for PortaPack
-        body: |
-          ## NMEA UART to I2C Converter for PortaPack H4M
-          
-          ### Features
-          - I2C address 0x10 (PortaPack standard)
-          - 4KB circular buffer
-          - UART 115200 baud
-          - Internal pull-up resistors
-          
-          ### Installation
-          1. Download `nmea_converter_portapack_release.uf2`
-          2. Connect RP2350-Zero to PC
-          3. Hold BOOT + press RESET
-          4. Copy .uf2 to RPI-RP2 drive
-          
-          ### Connections
-          - GPS TX → GPIO1 (Pin 1)
-          - I2C SDA → GPIO4 (Pin 4)
-          - I2C SCL → GPIO5 (Pin 5)
-        files: release/*.uf2
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
