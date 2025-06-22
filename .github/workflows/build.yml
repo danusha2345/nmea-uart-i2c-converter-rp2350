@@ -1,0 +1,72 @@
+name: Build RP2350 Firmware
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Cache Arduino packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.arduino15/packages
+          ~/.cache/arduino
+        key: ${{ runner.os }}-arduino-${{ hashFiles('**/build.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-arduino-
+        
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v1
+      
+    - name: Install RP2040/RP2350 Core
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040@3.6.1
+        
+    - name: Compile for RP2350
+      run: |
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build \
+          --export-binaries \
+          ./nmea_converter_rp2350_zero
+          
+    - name: Generate Build Info
+      run: |
+        echo "Build Date: $(date)" > build/build_info.txt
+        echo "Git Commit: ${{ github.sha }}" >> build/build_info.txt
+        echo "Arduino Core: rp2040:rp2040@3.6.1" >> build/build_info.txt
+        echo "Board: Raspberry Pi Pico 2 (RP2350)" >> build/build_info.txt
+          
+    - name: Upload Firmware Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: rp2350-firmware-${{ github.sha }}
+        path: |
+          build/*.uf2
+          build/*.elf
+          build/*.bin
+          build/build_info.txt
+        retention-days: 90
+        
+    - name: Upload to Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/*.uf2
+          build/build_info.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
