@@ -1,7 +1,7 @@
 /*
  * NMEA Test Generator
  * Generates synthetic NMEA data for testing UART to I2C converter
- * Compatible with: RP2040, RP2350, ESP32-C3, Arduino Uno/Nano, etc.
+ * Compatible with: RP2040, RP2350, ESP32-C3, etc.
  * 
  * Connections:
  * Generator TX -> Converter RX (GPIO1)
@@ -18,22 +18,12 @@
 // Pin configuration - adjust for your board
 #if defined(ESP32)
   #define TX_PIN 1   // ESP32-C3 default TX
-  #define LED_PIN 2  // ESP32-C3 onboard LED
   #define HAS_SERIAL1
 #elif defined(ARDUINO_ARCH_RP2040)
-  #define TX_PIN 0   // RP2040 default TX
-  #define LED_PIN 25 // RP2040 onboard LED (Pico has it)
+  #define TX_PIN 0   // RP2040/RP2350 default TX
   #define HAS_SERIAL1
-#elif defined(__AVR__)
-  // Arduino Uno/Nano - use software serial
-  #include <SoftwareSerial.h>
-  #define TX_PIN 3   // Software serial TX
-  #define RX_PIN 2   // Software serial RX (not used)
-  #define LED_PIN 13 // Arduino onboard LED
-  SoftwareSerial nmeaSerial(RX_PIN, TX_PIN);
 #else
   #define TX_PIN 1   // Default TX
-  #define LED_PIN LED_BUILTIN
   #define HAS_SERIAL1
 #endif
 
@@ -64,31 +54,21 @@ void setup() {
   #endif
   
   // Initialize UART for NMEA output
-  #ifdef HAS_SERIAL1
-    #ifdef ESP32
-      Serial1.begin(115200, SERIAL_8N1, -1, TX_PIN); // ESP32 allows pin remapping
-    #else
-      Serial1.begin(115200);
-    #endif
+  #ifdef ESP32
+    Serial1.begin(115200, SERIAL_8N1, -1, TX_PIN); // ESP32 allows pin remapping
   #else
-    // Use software serial for AVR boards
-    nmeaSerial.begin(115200);
+    Serial1.begin(115200);
   #endif
-  
-  // Configure LED
-  pinMode(LED_PIN, OUTPUT);
   
   // Startup message
   Serial.println(F("================================="));
-  Serial.println(F("    NMEA Test Generator v1.1    "));
+  Serial.println(F("    NMEA Test Generator v1.2    "));
   Serial.println(F("================================="));
   Serial.print(F("Board: "));
   #if defined(ESP32)
     Serial.println(F("ESP32"));
   #elif defined(ARDUINO_ARCH_RP2040)
     Serial.println(F("RP2040/RP2350"));
-  #elif defined(__AVR__)
-    Serial.println(F("Arduino AVR"));
   #else
     Serial.println(F("Unknown"));
   #endif
@@ -99,14 +79,6 @@ void setup() {
   Serial.print(NMEA_SEND_INTERVAL);
   Serial.println(F(" ms"));
   Serial.println(F("\nStarting NMEA generation...\n"));
-  
-  // Blink LED 3 times to indicate startup
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(100);
-    digitalWrite(LED_PIN, LOW);
-    delay(100);
-  }
 }
 
 void loop() {
@@ -115,9 +87,6 @@ void loop() {
   // Send NMEA sentences at regular intervals
   if (currentTime - lastSentTime >= NMEA_SEND_INTERVAL) {
     lastSentTime = currentTime;
-    
-    // Toggle LED to indicate transmission
-    digitalWrite(LED_PIN, HIGH);
     
     // Generate and send different NMEA sentences
     switch (sentenceCounter % 4) {
@@ -143,9 +112,6 @@ void loop() {
       longitude += 0.00001;  // Small movement east
       altitude += 0.1;       // Small altitude change
     }
-    
-    // Turn off LED
-    digitalWrite(LED_PIN, LOW);
   }
 }
 
@@ -340,14 +306,8 @@ String calculateNMEAChecksum(String sentence) {
 // Send NMEA sentence via Serial
 void sendNMEASentence(String sentence) {
   // Send to UART
-  #ifdef HAS_SERIAL1
-    Serial1.print(sentence);
-    Serial1.print("\r\n");
-  #else
-    // Use software serial for AVR
-    nmeaSerial.print(sentence);
-    nmeaSerial.print("\r\n");
-  #endif
+  Serial1.print(sentence);
+  Serial1.print("\r\n");
   
   // Echo to debug serial
   Serial.print(F("[SENT] "));
