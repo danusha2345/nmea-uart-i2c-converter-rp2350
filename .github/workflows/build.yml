@@ -34,7 +34,7 @@ jobs:
         arduino-cli config init
         arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
         arduino-cli core update-index
-        arduino-cli core install rp2040:rp2040@3.6.1
+        arduino-cli core install rp2040:rp2040
         
     - name: Compile for RP2350
       run: |
@@ -47,13 +47,13 @@ jobs:
       run: |
         echo "Build Date: $(date)" > build/build_info.txt
         echo "Git Commit: ${{ github.sha }}" >> build/build_info.txt
-        echo "Arduino Core: rp2040:rp2040@3.6.1" >> build/build_info.txt
+        echo "Arduino Core: rp2040:rp2040" >> build/build_info.txt
         echo "Board: Raspberry Pi Pico 2 (RP2350)" >> build/build_info.txt
           
     - name: Upload Firmware Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: rp2350-firmware-${{ github.sha }}
+        name: rp2350-firmware-${{ github.run_number }}
         path: |
           build/*.uf2
           build/*.elf
