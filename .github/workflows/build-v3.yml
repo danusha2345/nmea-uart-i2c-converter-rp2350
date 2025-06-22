@@ -1,0 +1,92 @@
+name: Build RP2350 Firmware v3
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v1.1.2
+      
+    - name: Install RP2040/RP2350 Core
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040
+        
+    - name: Compile OLD Converter (for compatibility)
+      run: |
+        mkdir -p firmware/old
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./firmware/old \
+          --export-binaries \
+          ./nmea_converter_rp2350_zero
+          
+    - name: Compile NEW Converter v3.0 FINAL
+      run: |
+        mkdir -p firmware/new
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./firmware/new \
+          --export-binaries \
+          ./nmea_converter_v3_final
+          
+    - name: Compile Working Converter (v2.5)
+      run: |
+        mkdir -p firmware/working
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./firmware/working \
+          --export-binaries \
+          ./nmea_converter_rp2350_working
+          
+    - name: Create Version Info
+      run: |
+        cat > firmware/README.txt << 'EOF'
+RP2350-Zero NMEA Converter Firmware Versions
+=============================================
+
+Choose the right version for your needs:
+
+1. new/nmea_converter_v3_final.uf2 (RECOMMENDED)
+   - Version 3.0 FINAL
+   - Built-in test mode (generates test data)
+   - 5 second startup delay
+   - Clear startup messages
+   - Use this for testing without external generator
+
+2. working/nmea_converter_rp2350_working.uf2
+   - Version 2.5
+   - Earlier version with test mode
+   - Shorter startup delay
+
+3. old/nmea_converter_rp2350_zero.uf2
+   - Version 2.3 (original)
+   - NO test mode
+   - Requires external NMEA source
+   - Use this if you have issues with newer versions
+
+To identify which version is running:
+- v3.0: Shows "[GENERATED]" messages
+- v2.5: Shows "[TEST DATA]" messages  
+- v2.3: Shows only "[STATUS]" messages
+
+Build Date: $(date)
+EOF
+        
+    - name: Upload All Firmware Versions
+      uses: actions/upload-artifact@v4
+      with:
+        name: rp2350-all-firmware-${{ github.run_number }}
+        path: |
+          firmware/**/*.uf2
+          firmware/README.txt
+        retention-days: 30
