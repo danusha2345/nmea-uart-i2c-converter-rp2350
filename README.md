@@ -1,0 +1,3 @@
+# NMEA UART to I2C Converter for RP2350-Zero
+
+Инициализация репозитория...
