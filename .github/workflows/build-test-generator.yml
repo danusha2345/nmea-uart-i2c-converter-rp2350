@@ -1,0 +1,74 @@
+name: Build Test Generator
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'test/nmea_test_generator/**'
+      - '.github/workflows/build-test-generator.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-multiple:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        board:
+          - { name: "RP2040 Pico", fqbn: "rp2040:rp2040:rpipico" }
+          - { name: "RP2350 Pico2", fqbn: "rp2040:rp2040:rpipico2" }
+          - { name: "ESP32-C3", fqbn: "esp32:esp32:esp32c3" }
+          - { name: "Arduino Uno", fqbn: "arduino:avr:uno" }
+          - { name: "Arduino Nano", fqbn: "arduino:avr:nano:cpu=atmega328" }
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v1
+      
+    - name: Install Arduino AVR Core
+      if: contains(matrix.board.fqbn, 'arduino:avr')
+      run: |
+        arduino-cli core update-index
+        arduino-cli core install arduino:avr
+        
+    - name: Install RP2040/RP2350 Core
+      if: contains(matrix.board.fqbn, 'rp2040')
+      run: |
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040
+        
+    - name: Install ESP32 Core
+      if: contains(matrix.board.fqbn, 'esp32')
+      run: |
+        arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+        arduino-cli core update-index
+        arduino-cli core install esp32:esp32
+        
+    - name: Compile Test Generator
+      run: |
+        mkdir -p ./build/${{ matrix.board.name }}
+        arduino-cli compile --fqbn ${{ matrix.board.fqbn }} \
+          --output-dir ./build/"${{ matrix.board.name }}" \
+          --export-binaries \
+          ./test/nmea_test_generator
+          
+    - name: Generate Build Info
+      run: |
+        echo "Build Date: $(date)" > "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "Board: ${{ matrix.board.name }}" >> "./build/${{ matrix.board.name }}/build_info.txt"
+        echo "FQBN: ${{ matrix.board.fqbn }}" >> "./build/${{ matrix.board.name }}/build_info.txt"
+        
+    - name: Upload Firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-generator-${{ matrix.board.name }}-${{ github.run_number }}
+        path: |
+          build/${{ matrix.board.name }}/*.hex
+          build/${{ matrix.board.name }}/*.bin
+          build/${{ matrix.board.name }}/*.uf2
+          build/${{ matrix.board.name }}/build_info.txt
+        retention-days: 30
