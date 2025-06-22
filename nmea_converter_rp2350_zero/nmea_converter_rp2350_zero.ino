@@ -1,6 +1,6 @@
 /*
  * NMEA UART to I2C Converter for Waveshare RP2350-Zero
- * Version: 2.2
+ * Version: 2.3
  * 
  * Features:
  * - Optimized for RP2350-Zero board
@@ -17,7 +17,12 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <hardware/gpio.h>
+
+// Include hardware headers for RP2040/RP2350
+#ifdef ARDUINO_ARCH_RP2040
+  #include <hardware/gpio.h>
+  #define HAS_RP2040_HARDWARE
+#endif
 
 // ====== BOARD SPECIFIC CONFIGURATION FOR RP2350-ZERO ======
 // GPIO Pin Configuration for Waveshare RP2350-Zero
@@ -52,7 +57,7 @@
 #define CMD_SET_MODE      0x07  // Set operation mode
 
 // Firmware info
-#define FIRMWARE_VERSION  0x22  // Version 2.2
+#define FIRMWARE_VERSION  0x23  // Version 2.3
 #define BOARD_TYPE       "RP2350-Zero"
 
 // Status flags structure
@@ -102,12 +107,19 @@ void updateStatusIndicator();
 // Initialize hardware with RP2350-Zero specific settings
 void initializeHardware() {
     // Configure I2C pins with internal pull-ups
+    #ifdef HAS_RP2040_HARDWARE
+    // For RP2040/RP2350 specific hardware functions
     gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_I2C);
     
-    // Enable internal pull-ups for I2C (важно для RP2350!)
+    // Enable internal pull-ups for I2C
     gpio_pull_up(I2C_SDA_PIN);
     gpio_pull_up(I2C_SCL_PIN);
+    #else
+    // Fallback for other platforms
+    pinMode(I2C_SDA_PIN, INPUT_PULLUP);
+    pinMode(I2C_SCL_PIN, INPUT_PULLUP);
+    #endif
     
     // Configure status LED if available
     if (HAS_STATUS_LED) {
@@ -389,22 +401,28 @@ void setup() {
     }
     
     Serial.println("=====================================");
-    Serial.println("  NMEA UART to I2C Converter v2.2  ");
+    Serial.println("  NMEA UART to I2C Converter v2.3  ");
     Serial.println("    For Waveshare RP2350-Zero      ");
     Serial.println("=====================================");
     
     // Initialize hardware
     initializeHardware();
     Serial.println("[OK] Hardware initialized");
+    #ifdef HAS_RP2040_HARDWARE
     Serial.println("     - I2C internal pull-ups enabled");
+    #else
+    Serial.println("     - Using Arduino pull-ups");
+    #endif
     
     // Initialize buffer
     initializeBuffer();
     Serial.println("[OK] Buffer initialized (4KB)");
     
     // Initialize UART for GNSS
+    #ifdef HAS_RP2040_HARDWARE
     Serial1.setRX(UART_RX_PIN);
     Serial1.setTX(UART_TX_PIN);
+    #endif
     Serial1.begin(UART_BAUD_RATE);
     Serial.println("[OK] UART initialized");
     Serial.print("     - RX: GPIO"); Serial.println(UART_RX_PIN);
@@ -412,8 +430,10 @@ void setup() {
     Serial.print("     - Baud: "); Serial.println(UART_BAUD_RATE);
     
     // Initialize I2C slave
+    #ifdef HAS_RP2040_HARDWARE
     Wire.setSDA(I2C_SDA_PIN);
     Wire.setSCL(I2C_SCL_PIN);
+    #endif
     Wire.begin(I2C_SLAVE_ADDRESS);
     Wire.onReceive(onI2CReceive);
     Wire.onRequest(onI2CRequest);
