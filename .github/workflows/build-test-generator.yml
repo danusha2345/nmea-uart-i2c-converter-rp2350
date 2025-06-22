@@ -16,27 +16,22 @@ jobs:
     strategy:
       matrix:
         board:
-          - { name: "RP2040 Pico", fqbn: "rp2040:rp2040:rpipico" }
-          - { name: "RP2350 Pico2", fqbn: "rp2040:rp2040:rpipico2" }
+          - { name: "RP2040-Pico", fqbn: "rp2040:rp2040:rpipico" }
+          - { name: "RP2040-Zero", fqbn: "rp2040:rp2040:rpipicow" }
+          - { name: "RP2040-Tiny", fqbn: "rp2040:rp2040:generic" }
+          - { name: "RP2350-Pico2", fqbn: "rp2040:rp2040:rpipico2" }
           - { name: "ESP32-C3", fqbn: "esp32:esp32:esp32c3" }
-          - { name: "Arduino Uno", fqbn: "arduino:avr:uno" }
-          - { name: "Arduino Nano", fqbn: "arduino:avr:nano:cpu=atmega328" }
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Setup Arduino CLI
       uses: arduino/setup-arduino-cli@v1
-      
-    - name: Install Arduino AVR Core
-      if: contains(matrix.board.fqbn, 'arduino:avr')
-      run: |
-        arduino-cli core update-index
-        arduino-cli core install arduino:avr
         
     - name: Install RP2040/RP2350 Core
       if: contains(matrix.board.fqbn, 'rp2040')
       run: |
+        arduino-cli config init
         arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
         arduino-cli core update-index
         arduino-cli core install rp2040:rp2040
@@ -44,6 +39,7 @@ jobs:
     - name: Install ESP32 Core
       if: contains(matrix.board.fqbn, 'esp32')
       run: |
+        arduino-cli config init
         arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
         arduino-cli core update-index
         arduino-cli core install esp32:esp32
