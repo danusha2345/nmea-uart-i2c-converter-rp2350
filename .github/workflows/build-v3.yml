@@ -15,7 +15,7 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Setup Arduino CLI
-      uses: arduino/setup-arduino-cli@v1.1.2
+      uses: arduino/setup-arduino-cli@v1
       
     - name: Install RP2040/RP2350 Core
       run: |
@@ -27,60 +27,51 @@ jobs:
     - name: Compile OLD Converter (for compatibility)
       run: |
         mkdir -p firmware/old
-        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
-          --output-dir ./firmware/old \
-          --export-binaries \
-          ./nmea_converter_rp2350_zero
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 --output-dir ./firmware/old --export-binaries ./nmea_converter_rp2350_zero
           
     - name: Compile NEW Converter v3.0 FINAL
       run: |
         mkdir -p firmware/new
-        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
-          --output-dir ./firmware/new \
-          --export-binaries \
-          ./nmea_converter_v3_final
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 --output-dir ./firmware/new --export-binaries ./nmea_converter_v3_final
           
     - name: Compile Working Converter (v2.5)
       run: |
         mkdir -p firmware/working
-        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
-          --output-dir ./firmware/working \
-          --export-binaries \
-          ./nmea_converter_rp2350_working
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 --output-dir ./firmware/working --export-binaries ./nmea_converter_rp2350_working
           
     - name: Create Version Info
       run: |
         cat > firmware/README.txt << 'EOF'
-RP2350-Zero NMEA Converter Firmware Versions
-=============================================
+        RP2350-Zero NMEA Converter Firmware Versions
+        =============================================
 
-Choose the right version for your needs:
+        Choose the right version for your needs:
 
-1. new/nmea_converter_v3_final.uf2 (RECOMMENDED)
-   - Version 3.0 FINAL
-   - Built-in test mode (generates test data)
-   - 5 second startup delay
-   - Clear startup messages
-   - Use this for testing without external generator
+        1. new/nmea_converter_v3_final.uf2 (RECOMMENDED)
+           - Version 3.0 FINAL
+           - Built-in test mode (generates test data)
+           - 5 second startup delay
+           - Clear startup messages
+           - Use this for testing without external generator
 
-2. working/nmea_converter_rp2350_working.uf2
-   - Version 2.5
-   - Earlier version with test mode
-   - Shorter startup delay
+        2. working/nmea_converter_rp2350_working.uf2
+           - Version 2.5
+           - Earlier version with test mode
+           - Shorter startup delay
 
-3. old/nmea_converter_rp2350_zero.uf2
-   - Version 2.3 (original)
-   - NO test mode
-   - Requires external NMEA source
-   - Use this if you have issues with newer versions
+        3. old/nmea_converter_rp2350_zero.uf2
+           - Version 2.3 (original)
+           - NO test mode
+           - Requires external NMEA source
+           - Use this if you have issues with newer versions
 
-To identify which version is running:
-- v3.0: Shows "[GENERATED]" messages
-- v2.5: Shows "[TEST DATA]" messages  
-- v2.3: Shows only "[STATUS]" messages
+        To identify which version is running:
+        - v3.0: Shows "[GENERATED]" messages
+        - v2.5: Shows "[TEST DATA]" messages  
+        - v2.3: Shows only "[STATUS]" messages
 
-Build Date: $(date)
-EOF
+        Build Date: $(date)
+        EOF
         
     - name: Upload All Firmware Versions
       uses: actions/upload-artifact@v4
