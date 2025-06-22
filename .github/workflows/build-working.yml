@@ -1,0 +1,93 @@
+name: Build Working Firmware
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'nmea_converter_rp2350_working/**'
+      - 'nmea_generator_rp2040_tiny/**'
+      - '.github/workflows/build-working.yml'
+  workflow_dispatch:
+
+jobs:
+  build-converter:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v1
+      
+    - name: Install RP2040/RP2350 Core
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040
+    
+    - name: Build RP2350-Zero Converter
+      run: |
+        mkdir -p ./build/converter
+        arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
+          --output-dir ./build/converter \
+          --export-binaries \
+          ./nmea_converter_rp2350_working
+    
+    - name: Build RP2040-Tiny Generator
+      run: |
+        mkdir -p ./build/generator
+        arduino-cli compile --fqbn rp2040:rp2040:generic \
+          --output-dir ./build/generator \
+          --export-binaries \
+          ./nmea_generator_rp2040_tiny
+    
+    - name: Create README
+      run: |
+        cat > ./build/README.txt << 'EOF'
+NMEA UART to I2C Converter - Working Version
+============================================
+
+This package contains:
+
+1. converter/nmea_converter_rp2350_working.uf2
+   - For: Waveshare RP2350-Zero
+   - Function: NMEA to I2C converter with built-in test mode
+   - I2C Address: 0x42
+   - Test Mode: Enabled by default (generates test data internally)
+
+2. generator/nmea_generator_rp2040_tiny.uf2
+   - For: Waveshare RP2040-Tiny
+   - Function: NMEA data generator for testing
+   - Output: GPIO0 (Pin 0 right side)
+
+CONNECTION FOR TESTING:
+======================
+RP2040-Tiny             RP2350-Zero
+-----------             -----------
+GPIO0 (Pin 0) --------> GPIO1 (Pin 1)
+GND ------------------> GND
+
+Both pins are on the right side of the boards, counting from top.
+
+HOW TO USE:
+===========
+1. Load converter firmware on RP2350-Zero
+2. Load generator firmware on RP2040-Tiny  
+3. Connect as shown above
+4. Open Serial Monitor for RP2350-Zero (115200 baud)
+5. You should see NMEA data being received
+
+For production use, change TEST_MODE to false in converter code.
+
+Build Date: $(date)
+EOF
+    
+    - name: Upload Firmware Package
+      uses: actions/upload-artifact@v4
+      with:
+        name: nmea-working-firmware-${{ github.run_number }}
+        path: |
+          build/**/*.uf2
+          build/README.txt
+        retention-days: 30
