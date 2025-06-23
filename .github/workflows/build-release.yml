@@ -35,21 +35,25 @@ jobs:
         cat > ./release/README.txt << 'EOF'
         NMEA UART to I2C Converter for PortaPack H4M
         =============================================
-        Version: 1.1 RELEASE
+        Version: 1.2 RELEASE
         Board: Waveshare RP2350-Zero
         I2C Address: 0x10 (PortaPack standard)
         
-        WHAT'S NEW IN v1.1:
+        WHAT'S NEW IN v1.2:
+        - Maximum I2C packet size: 255 bytes (I2C protocol limit)
+        - 3-4 NMEA sentences transfer in single transaction
+        - Minimal protocol overhead (<3%)
+        - Maximum possible efficiency for I2C
+        
+        Previous v1.1:
         - Optimized I2C packet size from 32 to 96 bytes
-        - 95% of NMEA sentences now transfer in single transaction
-        - Reduced protocol overhead from 30% to 8%
-        - Improved overall data transfer efficiency
         
         FEATURES:
         - UART to I2C bridge for NMEA GPS data
         - 4KB circular buffer
         - Compatible with PortaPack H4M GPS application
         - Internal I2C pull-up resistors enabled
+        - NO filtering - ALL NMEA messages are passed through
         
         CONNECTIONS:
         GPS Module          RP2350-Zero         PortaPack H4M
@@ -83,25 +87,32 @@ jobs:
         I2C PROTOCOL:
         - 0x01: GET_STATUS (returns 1 byte)
         - 0x02: GET_COUNT (returns 2 bytes, little-endian)
-        - 0x03: READ_DATA (returns up to 96 bytes) <- OPTIMIZED!
+        - 0x03: READ_DATA (returns up to 255 bytes) <- MAXIMUM!
         - 0x04: CLEAR_BUFFER (returns 0x01)
-        - 0x05: GET_VERSION (returns 0x11 for v1.1)
+        - 0x05: GET_VERSION (returns 0x12 for v1.2)
+        
+        NMEA MESSAGES:
+        ALL NMEA messages from GPS are transmitted without filtering:
+        - GPS: $GPGGA, $GPRMC, $GPGSA, $GPGSV, $GPVTG, $GPGLL
+        - GLONASS: $GLGGA, $GLRMC, $GLGSV
+        - Multi-GNSS: $GNGGA, $GNRMC, $GNGSA
+        - Proprietary: $PMTK, $PUBX, etc.
         
         Build Date: $(date)
         EOF
     
     - name: Create Version File
       run: |
-        echo "1.1.0" > ./release/VERSION
+        echo "1.2.0" > ./release/VERSION
         echo "Release for PortaPack H4M" >> ./release/VERSION
         echo "I2C Address: 0x10" >> ./release/VERSION
-        echo "I2C Packet: 96 bytes" >> ./release/VERSION
+        echo "I2C Packet: 255 bytes (MAX)" >> ./release/VERSION
         echo "Build: $(date +%Y%m%d-%H%M%S)" >> ./release/VERSION
     
     - name: Upload Release Package
       uses: actions/upload-artifact@v4
       with:
-        name: NMEA-Converter-PortaPack-v1.1-RELEASE
+        name: NMEA-Converter-PortaPack-v1.2-RELEASE
         path: |
           release/*.uf2
           release/README.txt
