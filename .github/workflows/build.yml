@@ -1,31 +1,21 @@
-name: Build RP2350 Firmware
+name: Build NMEA Converter
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-  release:
-    types: [created]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
     
-    - name: Cache Arduino packages
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.arduino15/packages
-          ~/.cache/arduino
-        key: ${{ runner.os }}-arduino-${{ hashFiles('**/build.yml') }}
-        restore-keys: |
-          ${{ runner.os }}-arduino-
-        
     - name: Setup Arduino CLI
       uses: arduino/setup-arduino-cli@v1
       
@@ -36,37 +26,77 @@ jobs:
         arduino-cli core update-index
         arduino-cli core install rp2040:rp2040
         
-    - name: Compile for RP2350
+    - name: Build Firmware
       run: |
+        mkdir -p build
         arduino-cli compile --fqbn rp2040:rp2040:rpipico2 \
           --output-dir ./build \
           --export-binaries \
-          ./nmea_converter_rp2350_zero
+          ./src
           
-    - name: Generate Build Info
+    - name: Rename output file
       run: |
-        echo "Build Date: $(date)" > build/build_info.txt
-        echo "Git Commit: ${{ github.sha }}" >> build/build_info.txt
-        echo "Arduino Core: rp2040:rp2040" >> build/build_info.txt
-        echo "Board: Raspberry Pi Pico 2 (RP2350)" >> build/build_info.txt
+        cd build
+        mv nmea_converter.ino.uf2 nmea_converter.uf2
           
-    - name: Upload Firmware Artifacts
+    - name: Create Release Info
+      run: |
+        echo "NMEA Converter v3.2 Build Information" > build/BUILD_INFO.txt
+        echo "=====================================" >> build/BUILD_INFO.txt
+        echo "Build Date: $(date)" >> build/BUILD_INFO.txt
+        echo "Git Commit: ${{ github.sha }}" >> build/BUILD_INFO.txt
+        echo "" >> build/BUILD_INFO.txt
+        echo "Features:" >> build/BUILD_INFO.txt
+        echo "- Dual-core processing (Active Core 1)" >> build/BUILD_INFO.txt
+        echo "- 255-byte I2C packets" >> build/BUILD_INFO.txt
+        echo "- I2C address: 0x10" >> build/BUILD_INFO.txt
+        echo "- 255-character NMEA support" >> build/BUILD_INFO.txt
+        echo "- Position caching" >> build/BUILD_INFO.txt
+        echo "- NMEA filtering" >> build/BUILD_INFO.txt
+        echo "- Thread-safe operations" >> build/BUILD_INFO.txt
+        echo "" >> build/BUILD_INFO.txt
+        echo "Installation:" >> build/BUILD_INFO.txt
+        echo "1. Connect RP2350-Zero via USB while holding BOOT button" >> build/BUILD_INFO.txt
+        echo "2. Copy nmea_converter.uf2 to RPI-RP2 drive" >> build/BUILD_INFO.txt
+        echo "3. Device will reboot automatically" >> build/BUILD_INFO.txt
+        
+    - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rp2350-firmware-${{ github.run_number }}
+        name: nmea-converter-firmware-${{ github.run_number }}
         path: |
-          build/*.uf2
-          build/*.elf
-          build/*.bin
-          build/build_info.txt
-        retention-days: 90
+          build/nmea_converter.uf2
+          build/BUILD_INFO.txt
+        retention-days: 30
         
-    - name: Upload to Release
-      if: github.event_name == 'release'
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          build/*.uf2
-          build/build_info.txt
+          build/nmea_converter.uf2
+          build/BUILD_INFO.txt
+        body: |
+          ## NMEA UART to I2C Converter v3.2
+          
+          ### 🎯 Key Features
+          - Full dual-core processing with active Core 1
+          - 255-byte I2C packets (maximum size)
+          - I2C address: 0x10
+          - Position caching and NMEA filtering
+          - Thread-safe operations
+          
+          ### 📦 Installation
+          1. Download `nmea_converter.uf2`
+          2. Connect RP2350-Zero via USB while holding BOOT button
+          3. Copy the .uf2 file to RPI-RP2 drive
+          4. Device will reboot automatically
+          
+          ### 📌 Connections
+          - GPS TX → GPIO1 (UART RX)
+          - I2C SDA → GPIO4
+          - I2C SCL → GPIO5
+          
+          See [README](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
