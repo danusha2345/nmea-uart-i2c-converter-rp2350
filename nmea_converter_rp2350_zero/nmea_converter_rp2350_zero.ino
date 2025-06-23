@@ -1,6 +1,6 @@
 /*
  * NMEA UART to I2C Converter for Waveshare RP2350-Zero
- * Version: 2.5
+ * Version: 3.0
  * 
  * Features:
  * - Optimized for RP2350-Zero board
@@ -10,8 +10,9 @@
  * - Circular buffer with overflow protection
  * - NMEA checksum validation
  * - Multiple I2C commands support
- * - Optimized 96-byte I2C packet size for NMEA efficiency
+ * - Optimized 96-byte I2C packet size
  * - Extended NMEA support (up to 255 characters)
+ * - Thread-safe buffer operations
  * 
  * Author: GitHub Actions Builder
  * License: MIT
@@ -46,7 +47,7 @@
 #define I2C_SLAVE_ADDRESS 0x42  // I2C slave address
 #define UART_BAUD_RATE 115200   // UART baud rate for GNSS
 #define NMEA_BUFFER_SIZE 4096   // Main buffer size
-#define I2C_PACKET_SIZE 96      // I2C packet size - optimized for NMEA (was 32)
+#define I2C_PACKET_SIZE 96      // I2C packet size - optimized for Wire library
 #define NMEA_MAX_LENGTH 255     // Max NMEA sentence length - extended for modern GNSS
 
 // I2C Commands
@@ -56,10 +57,10 @@
 #define CMD_CLEAR_BUFFER  0x04  // Clear all buffered data
 #define CMD_GET_VERSION   0x05  // Get firmware version
 #define CMD_GET_INFO      0x06  // Get device info
-#define CMD_SET_MODE      0x07  // Set operation mode
+#define CMD_SET_MODE      0x07  // Set operation mode (reserved)
 
 // Firmware info
-#define FIRMWARE_VERSION  0x25  // Version 2.5 - extended NMEA support
+#define FIRMWARE_VERSION  0x30  // Version 3.0
 #define BOARD_TYPE       "RP2350-Zero"
 
 // Status flags structure
@@ -88,7 +89,7 @@ typedef struct {
 // Global variables
 SharedBuffer nmeaData;
 char currentSentence[NMEA_MAX_LENGTH + 1];
-uint8_t sentenceIndex = 0;
+uint16_t sentenceIndex = 0;
 bool inSentence = false;
 volatile uint8_t lastI2CCommand = 0;
 volatile uint32_t lastDataTime = 0;
@@ -100,7 +101,7 @@ void initializeBuffer();
 bool writeToBuffer(const char* data, uint16_t length);
 uint16_t readFromBuffer(char* output, uint16_t maxLength);
 uint8_t calculateNMEAChecksum(const char* sentence);
-bool validateNMEASentence(const char* sentence, uint8_t length);
+bool validateNMEASentence(const char* sentence, uint16_t length);
 void processUARTChar(char c);
 void onI2CReceive(int bytes);
 void onI2CRequest();
@@ -283,6 +284,7 @@ void processUARTChar(char c) {
         // Sentence too long, discard
         inSentence = false;
         nmeaData.status.uartError = 1;
+        nmeaData.errorCount++;
     }
 }
 
@@ -403,7 +405,7 @@ void setup() {
     }
     
     Serial.println("=====================================");
-    Serial.println("  NMEA UART to I2C Converter v2.5  ");
+    Serial.println("  NMEA UART to I2C Converter v3.0  ");
     Serial.println("    For Waveshare RP2350-Zero      ");
     Serial.println("=====================================");
     
@@ -445,10 +447,16 @@ void setup() {
     Serial.println(I2C_SLAVE_ADDRESS, HEX);
     Serial.print("     - SDA: GPIO"); Serial.println(I2C_SDA_PIN);
     Serial.print("     - SCL: GPIO"); Serial.println(I2C_SCL_PIN);
-    Serial.print("     - Packet size: "); Serial.print(I2C_PACKET_SIZE); Serial.println(" bytes");
+    Serial.print("     - I2C packet size: "); Serial.print(I2C_PACKET_SIZE); Serial.println(" bytes");
+    Serial.print("     - Max NMEA length: "); Serial.print(NMEA_MAX_LENGTH); Serial.println(" characters");
+    
+    Serial.println("\n[INFO] Features:");
+    Serial.println("     - Dual-core support (Core 1 reserved)");
+    Serial.println("     - Thread-safe circular buffer");
+    Serial.println("     - Extended NMEA support (255 chars)");
+    Serial.println("     - NMEA checksum validation");
     
     Serial.println("\n[READY] Waiting for NMEA data...\n");
-    Serial.println("[INFO] Extended NMEA support up to 255 characters");
 }
 
 // Core 0 main loop - UART processing
@@ -486,7 +494,7 @@ void loop() {
     }
 }
 
-// Core 1 setup (optional - for future dual-core features)
+// Core 1 setup (reserved for future dual-core features)
 void setup1() {
     // Core 1 can be used for additional processing
     // Currently not used
