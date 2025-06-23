@@ -1,6 +1,6 @@
 /*
  * NMEA UART to I2C Converter for Waveshare RP2350-Zero
- * Version: 2.4
+ * Version: 2.5
  * 
  * Features:
  * - Optimized for RP2350-Zero board
@@ -11,6 +11,7 @@
  * - NMEA checksum validation
  * - Multiple I2C commands support
  * - Optimized 96-byte I2C packet size for NMEA efficiency
+ * - Extended NMEA support (up to 255 characters)
  * 
  * Author: GitHub Actions Builder
  * License: MIT
@@ -46,7 +47,7 @@
 #define UART_BAUD_RATE 115200   // UART baud rate for GNSS
 #define NMEA_BUFFER_SIZE 4096   // Main buffer size
 #define I2C_PACKET_SIZE 96      // I2C packet size - optimized for NMEA (was 32)
-#define NMEA_MAX_LENGTH 82      // Max NMEA sentence length
+#define NMEA_MAX_LENGTH 255     // Max NMEA sentence length - extended for modern GNSS
 
 // I2C Commands
 #define CMD_GET_STATUS    0x01  // Get device status
@@ -58,7 +59,7 @@
 #define CMD_SET_MODE      0x07  // Set operation mode
 
 // Firmware info
-#define FIRMWARE_VERSION  0x24  // Version 2.4 - optimized packet size
+#define FIRMWARE_VERSION  0x25  // Version 2.5 - extended NMEA support
 #define BOARD_TYPE       "RP2350-Zero"
 
 // Status flags structure
@@ -225,7 +226,7 @@ uint8_t calculateNMEAChecksum(const char* sentence) {
 }
 
 // Validate NMEA sentence format and checksum
-bool validateNMEASentence(const char* sentence, uint8_t length) {
+bool validateNMEASentence(const char* sentence, uint16_t length) {
     // Check minimum length
     if (length < 8 || sentence[0] != '$') return false;
     
@@ -402,7 +403,7 @@ void setup() {
     }
     
     Serial.println("=====================================");
-    Serial.println("  NMEA UART to I2C Converter v2.4  ");
+    Serial.println("  NMEA UART to I2C Converter v2.5  ");
     Serial.println("    For Waveshare RP2350-Zero      ");
     Serial.println("=====================================");
     
@@ -447,6 +448,7 @@ void setup() {
     Serial.print("     - Packet size: "); Serial.print(I2C_PACKET_SIZE); Serial.println(" bytes");
     
     Serial.println("\n[READY] Waiting for NMEA data...\n");
+    Serial.println("[INFO] Extended NMEA support up to 255 characters");
 }
 
 // Core 0 main loop - UART processing
