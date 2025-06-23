@@ -35,22 +35,27 @@ jobs:
         cat > ./release/README.txt << 'EOF'
         NMEA UART to I2C Converter for PortaPack H4M
         =============================================
-        Version: 1.2 RELEASE
+        Version: 1.3 RELEASE - Dual-Core Architecture
         Board: Waveshare RP2350-Zero
         I2C Address: 0x10 (PortaPack standard)
         
-        WHAT'S NEW IN v1.2:
-        - Maximum I2C packet size: 255 bytes (I2C protocol limit)
-        - 3-4 NMEA sentences transfer in single transaction
-        - Minimal protocol overhead (<3%)
-        - Maximum possible efficiency for I2C
+        WHAT'S NEW IN v1.3:
+        ⭐ DUAL-CORE ARCHITECTURE:
+        - Core 0: Dedicated UART processing
+        - Core 1: Dedicated I2C communication
+        - ELIMINATED all conflicts between UART and I2C
+        - Thread-safe operations with critical sections
+        - Improved stability and performance
         
-        Previous v1.1:
-        - Optimized I2C packet size from 32 to 96 bytes
+        Previous versions:
+        - v1.2: 255-byte I2C packets (maximum)
+        - v1.1: 96-byte I2C packets
+        - v1.0: 32-byte I2C packets
         
         FEATURES:
         - UART to I2C bridge for NMEA GPS data
-        - 4KB circular buffer
+        - 4KB circular buffer with thread safety
+        - Zero conflicts between UART receive and I2C requests
         - Compatible with PortaPack H4M GPS application
         - Internal I2C pull-up resistors enabled
         - NO filtering - ALL NMEA messages are passed through
@@ -87,9 +92,24 @@ jobs:
         I2C PROTOCOL:
         - 0x01: GET_STATUS (returns 1 byte)
         - 0x02: GET_COUNT (returns 2 bytes, little-endian)
-        - 0x03: READ_DATA (returns up to 255 bytes) <- MAXIMUM!
+        - 0x03: READ_DATA (returns up to 255 bytes)
         - 0x04: CLEAR_BUFFER (returns 0x01)
-        - 0x05: GET_VERSION (returns 0x12 for v1.2)
+        - 0x05: GET_VERSION (returns 0x13 for v1.3)
+        - 0x06: GET_INFO (extended info with core statistics)
+        
+        STATUS OUTPUT (via USB Serial):
+        Connect to serial monitor (115200 baud) to see:
+        - Real-time statistics every 10 seconds
+        - UART characters processed
+        - I2C requests handled
+        - Buffer status and data rate
+        - Error counts
+        
+        DUAL-CORE BENEFITS:
+        1. No buffer conflicts - each core has dedicated tasks
+        2. Higher throughput - parallel processing
+        3. Better stability - isolated operations
+        4. Zero blocking between UART and I2C
         
         NMEA MESSAGES:
         ALL NMEA messages from GPS are transmitted without filtering:
@@ -103,16 +123,17 @@ jobs:
     
     - name: Create Version File
       run: |
-        echo "1.2.0" > ./release/VERSION
+        echo "1.3.0" > ./release/VERSION
         echo "Release for PortaPack H4M" >> ./release/VERSION
         echo "I2C Address: 0x10" >> ./release/VERSION
         echo "I2C Packet: 255 bytes (MAX)" >> ./release/VERSION
+        echo "Architecture: Dual-Core (Core0: UART, Core1: I2C)" >> ./release/VERSION
         echo "Build: $(date +%Y%m%d-%H%M%S)" >> ./release/VERSION
     
     - name: Upload Release Package
       uses: actions/upload-artifact@v4
       with:
-        name: NMEA-Converter-PortaPack-v1.2-RELEASE
+        name: NMEA-Converter-PortaPack-v1.3-RELEASE
         path: |
           release/*.uf2
           release/README.txt
