@@ -1,25 +1,30 @@
-# Build artifacts
+# Build files
 build/
 *.uf2
-*.elf
 *.bin
+*.elf
 *.hex
 
-# IDE specific
+# Arduino IDE
+.arduino15/
+libraries/
+
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS specific
+# OS files
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# Arduino
-.development
+# Temporary files
 *.tmp
+*.bak
+*.old
 
-# Logs
+# Debug files
 *.log
+debug/
